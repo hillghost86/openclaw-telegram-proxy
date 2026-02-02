@@ -1,0 +1,15 @@
+{
+  "id": "openclaw-telegram-proxy",
+  "channels": [],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "proxyUrl": {
+        "type": "string",
+        "description": "Telegram API proxy URL (e.g., https://tgapi.dfcer.com)",
+        "default": ""
+      }
+    }
+  }
+}

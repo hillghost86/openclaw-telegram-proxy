@@ -1,0 +1,34 @@
+{
+  "name": "openclaw-telegram-proxy",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin to replace api.telegram.org with custom proxy for Telegram access in restricted regions",
+  "type": "module",
+  "main": "index.ts",
+  "keywords": [
+    "openclaw",
+    "telegram",
+    "proxy",
+    "telegram-api",
+    "china",
+    "vpn",
+    "reverse-proxy"
+  ],
+  "author": "DeepForceCryptoer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy/issues"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy#readme",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
