@@ -7,7 +7,7 @@
     "properties": {
       "proxyUrl": {
         "type": "string",
-        "description": "Telegram API proxy URL (e.g., https://tgapi.dfcer.com)",
+        "description": "Telegram API proxy URL (e.g., https://tgapi.yourdomain.com)",
         "default": ""
       }
     }

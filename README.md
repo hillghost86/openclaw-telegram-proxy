@@ -16,37 +16,41 @@
 - ✅ 不影响其他网络请求
 - ✅ 无需修改 OpenClaw 源码
 
-## 安装
+## 如何使用
 
-### 方式 1: 手动安装（推荐）
+### 方法 1: Git Clone（推荐）
+
+```bash
+cd ~/.openclaw/extensions
+git clone https://github.com/hillghost86/openclaw-telegram-proxy.git
+cd openclaw-telegram-proxy
+```
+
+### 方法 2: 手动下载
 
 ```bash
 # 创建插件目录
 mkdir -p ~/.openclaw/extensions/openclaw-telegram-proxy
 
-# 下载插件文件
-curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/index.ts https://raw.githubusercontent.com/yourusername/openclaw-telegram-proxy/main/index.ts
-curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/package.json https://raw.githubusercontent.com/yourusername/openclaw-telegram-proxy/main/package.json
-curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/openclaw.plugin.json https://raw.githubusercontent.com/yourusername/openclaw-telegram-proxy/main/openclaw.plugin.json
+# 下载所有必要文件
+curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/index.ts https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/main/index.ts
+curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/package.json https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/main/package.json
+curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/openclaw.plugin.json https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/main/openclaw.plugin.json
+curl -o ~/.openclaw/extensions/openclaw-telegram-proxy/worker.js https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/main/worker.js
 ```
 
-### 方式 2: Git Clone
+
+
+## 快速配置
+
+### 1. 编辑 OpenClaw 配置文件
 
 ```bash
-cd ~/.openclaw/extensions
-git clone https://github.com/yourusername/openclaw-telegram-proxy.git
-cd openclaw-telegram-proxy
+# 编辑 OpenClaw 配置
+openclaw config edit
 ```
 
-### 方式 3: NPM 安装（计划中）
-
-```bash
-npm install -g openclaw-telegram-proxy
-```
-
-## 配置
-
-编辑 OpenClaw 配置文件 (`~/.openclaw/openclaw.json`)：
+在配置中添加：
 
 ```json
 {
@@ -55,7 +59,7 @@ npm install -g openclaw-telegram-proxy
       "openclaw-telegram-proxy": {
         "enabled": true,
         "config": {
-          "proxyUrl": "https://tgapi.dfcer.com"
+          "proxyUrl": "https://your-proxy-domain.com"
         }
       }
     }
@@ -63,51 +67,74 @@ npm install -g openclaw-telegram-proxy
 }
 ```
 
-### 配置说明
+**重要**: 将 `https://your-proxy-domain.com` 替换为你实际的反向代理地址，例如：
+- `https://telegram-proxy.hillghost86.workers.dev` (Cloudflare Workers)
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `proxyUrl` | string | 是 | Telegram API 反向代理地址 |
-| `enabled` | boolean | 否 | 是否启用插件，默认 `true` |
 
-### 反向代理地址格式
-
-必须以 `https://` 或 `http://` 开头，例如：
-
-- `https://tgapi.dfcer.com`
-- `https://api.telegram.org.myproxy.com`
-
-## 使用
-
-配置完成后，重启 OpenClaw：
+### 2. 重启 OpenClaw
 
 ```bash
-# 方式 1: 如果作为服务运行
+# 重启使配置生效
 openclaw gateway restart
-
-# 方式 2: 如果使用 systemd
-systemctl restart openclaw
-
-# 方式 3: 停止后重新启动
-pkill -f openclaw
-openclaw gateway start
 ```
 
-### 验证插件是否生效
+### 3. 验证插件是否生效
 
-查看 OpenClaw 日志，应该看到类似输出：
+查看 OpenClaw 日志，应该看到：
 
 ```
-[openclaw-telegram-proxy] Applied proxy: https://tgapi.dfcer.com
+[openclaw-telegram-proxy] Applied proxy: https://your-proxy-domain.com
 ```
 
 如果看到：
-
 ```
-[openclaw-telegram-proxy] No proxy URL configured, using direct connection
+[openclaw-telegram-proxy] No plugin URL configured, using direct connection
 ```
 
 说明配置有问题，请检查 `proxyUrl` 是否正确设置。
+
+## 反向代理部署
+
+本插件需要配合 Telegram API 反向代理使用。以下是推荐方案：
+
+### Cloudflare Workers（推荐）
+
+Cloudflare Workers 是免费的全球边缘计算平台，非常适合作为 Telegram API 代理。
+
+**优点：**
+- ✅ 免费使用（每天 100,000 次请求）
+- ✅ 全球 CDN 加速
+- ✅ 自动 HTTPS
+- ✅ 无需服务器
+- ✅ 部署简单
+
+**部署步骤：**
+
+1. 访问 https://dash.cloudflare.com
+2. 进入 **Workers & Pages**
+3. 点击 **Create application**
+4. 应用名称：`telegram-proxy`（或其他你喜欢的）
+5. 创建类型：**Create Worker**
+6. 选择 **Hello World** 模板
+7. 编辑 Worker，粘贴 `worker.js` 代码
+8. 保存并部署
+
+部署成功后，你会得到一个 URL，例如：
+```
+https://telegram-proxy.hillghost86.workers.dev
+```
+
+**使用 Worker：**
+
+部署成功后，配置到 OpenClaw 的 `proxyUrl` 即可。
+
+### 使用现成服务
+
+- 其他社区代理 - 搜索 "telegram bot api proxy"
+
+### 自建 Nginx 反向代理
+
+需要一台境外的服务器（VPS），详细配置请参考 README 中的完整说明。
 
 ## 工作原理
 
@@ -117,55 +144,13 @@ openclaw gateway start
 4. **URL 替换**: 检测所有请求 URL，如果包含 `api.telegram.org`，则替换为 `proxyUrl`
 5. **透明代理**: 其他网络请求不受影响
 
-## 反向代理搭建
-
-你需要一个 Telegram API 反向代理。以下是几种搭建方式：
-
-### 方式 1: 使用现成服务
-
-- **tgapi.dfcer.com** - 社区提供的代理（可能不稳定）
-- 其他社区代理 - 搜索 "telegram bot api proxy"
-
-### 方式 2: 自建 Nginx 反向代理
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name tgapi.yourdomain.com;
-    
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    location / {
-        proxy_pass https://api.telegram.org;
-        proxy_set_header Host api.telegram.org;
-        proxy_ssl_server_name on;
-        proxy_ssl_protocols TLSv1.2 TLSv1.3;
-    }
-}
-```
-
-### 方式 3: Cloudflare Workers
-
-```javascript
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    url.hostname = "api.telegram.org";
-    
-    const newRequest = new Request(url, request);
-    return fetch(newRequest);
-  }
-}
-```
-
 ## 故障排除
 
 ### 插件未生效
 
 **问题**: 日志显示 `No plugin config found`
 
-**解决**: 
+**解决**:
 1. 检查配置文件路径是否正确
 2. 确认 JSON 格式正确（无语法错误）
 3. 重启 OpenClaw
@@ -175,16 +160,19 @@ export default {
 **问题**: 插件已加载，但 Telegram 仍然无法工作
 
 **解决**:
-1. 测试反向代理地址是否可访问：`curl https://tgapi.dfcer.com`
+1. 测试反向代理地址是否可访问：`curl https://your-proxy-domain.com`
 2. 检查反向代理是否正确转发到 `api.telegram.org`
 3. 查看 OpenClaw 详细日志：`openclaw logs --follow`
 4. 确认 Telegram Bot Token 是否有效
 
-### 其他网络请求受影响
+### Cloudflare Workers 配额用尽
 
-**问题**: 其他网站无法访问
+**问题**: Worker 返回 429 Too Many Requests 错误
 
-**解决**: 本插件只拦截包含 `api.telegram.org` 的请求，不应该影响其他网络。如果出现问题，请提交 Issue。
+**解决**:
+1. 升级到 Workers Paid 计划
+2. 减少不必要的请求
+3. 查看 Workers Metrics 了解请求量
 
 ## 开发
 
@@ -201,35 +189,24 @@ openclaw gateway restart
 openclaw logs --follow | grep telegram-proxy
 ```
 
-### 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
 ## 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT License - 详见项目中的 [LICENSE](LICENSE) 文件
 
 ## 作者
 
-- **作者**: DeepForceCryptoer
-- **GitHub**: [yourusername](https://github.com/yourusername)
+- **作者**: hillghost86
+- **GitHub**: [hillghost86](https://github.com/hillghost86)
 
 ## 致谢
 
 - [OpenClaw](https://github.com/openclaw/openclaw) - OpenClaw 项目
+- [Cloudflare](https://workers.cloudflare.com/) - Cloudflare Workers 平台
 - 社区反馈 - 帮助测试和改进
-
-## 更新日志
-
-### v1.0.0 (2026-02-03)
-
-- 🎉 首次发布
-- ✅ 支持自动拦截 Telegram API 请求
-- ✅ 支持自定义反向代理地址
-- ✅ 支持配置热重载
 
 ## 相关链接
 
 - [OpenClaw 文档](https://docs.openclaw.ai)
 - [OpenClaw Discord](https://discord.com/invite/clawd)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
+- [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)

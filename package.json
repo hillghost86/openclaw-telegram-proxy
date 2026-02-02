@@ -17,12 +17,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy.git"
+    "url": "https://github.com/hillghost86/openclaw-telegram-proxy.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy/issues"
+    "url": "https://github.com/hillghost86/openclaw-telegram-proxy/issues"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/openclaw-telegram-proxy#readme",
+  "homepage": "https://github.com/hillghost86/openclaw-telegram-proxy#readme",
   "devDependencies": {
     "openclaw": "workspace:*"
   },
