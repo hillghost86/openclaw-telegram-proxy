@@ -1,9 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # OpenClaw Telegram Proxy 插件安装脚本
-# 自动将 NPM 包复制到 OpenClaw 插件目录
+# 自动将插件复制到 OpenClaw 插件目录
+#
+# 支持三种安装方式:
+#   1. Git Clone: git clone $GITHUB_REPO && cd openclaw-telegram-proxy && ./install.sh
+#   2. NPM:       npm install -g openclaw-telegram-proxy
+#   3. 直接下载:  curl -sSL https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/main/install.sh | bash
+#
+# 用法:
+#   bash install.sh                    # 交互式配置
+#   bash install.sh https://proxy.com   # 命令行参数自动配置
+#   OPENCLAW_TELEGRAM_PROXY_URL=https://proxy.com bash install.sh  # 环境变量自动配置
 
 set -e
+
+GITHUB_REPO="https://github.com/hillghost86/openclaw-telegram-proxy.git"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -13,7 +25,13 @@ NC='\033[0m'
 
 # 配置
 PLUGIN_NAME="openclaw-telegram-proxy"
-EXT_DIR="$HOME/.openclaw/extensions"
+# 使用 sudo 时，写入实际用户的 home（兼容 Linux/macOS）
+if [ -n "$SUDO_USER" ]; then
+    REAL_HOME=$(eval echo "~$SUDO_USER")
+else
+    REAL_HOME="${HOME:-$(eval echo ~)}"
+fi
+EXT_DIR="$REAL_HOME/.openclaw/extensions"
 PLUGIN_DIR="$EXT_DIR/$PLUGIN_NAME"
 
 echo -e "${GREEN}========================================${NC}"
@@ -21,22 +39,70 @@ echo -e "${GREEN}  OpenClaw Telegram Proxy 安装脚本${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
-# 检查 NPM 是否已安装
-if ! npm list -g "$PLUGIN_NAME" > /dev/null 2>&1; then
-    echo -e "${YELLOW}⚠️  $PLUGIN_NAME 未安装${NC}"
-    echo -e "${YELLOW}请先运行: npm install -g $PLUGIN_NAME${NC}"
-    exit 1
+# 确定源路径：1.脚本所在目录 2.当前目录 3.npm 4.从 GitHub 下载
+SOURCE_PATH=""
+# 1. 脚本所在目录（支持从任意位置运行 install.sh）
+if [ -n "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$SCRIPT_DIR/index.ts" ] && [ -f "$SCRIPT_DIR/openclaw.plugin.json" ]; then
+        SOURCE_PATH="$SCRIPT_DIR"
+    fi
+fi
+# 2. 当前目录
+if [ -z "$SOURCE_PATH" ] && [ -f "index.ts" ] && [ -f "openclaw.plugin.json" ]; then
+    SOURCE_PATH="$(pwd)"
+fi
+# 3. NPM 全局安装
+if [ -z "$SOURCE_PATH" ] && npm list -g "$PLUGIN_NAME" > /dev/null 2>&1; then
+    SOURCE_PATH="$(npm root -g | tr -d '\n')/$PLUGIN_NAME"
+fi
+# 4. 从 GitHub 下载
+CLEANUP_TEMP=""
+if [ -z "$SOURCE_PATH" ]; then
+    echo -e "${YELLOW}未找到插件，正在从 GitHub 下载...${NC}"
+    TEMP_DIR=$(mktemp -d 2>/dev/null || echo "/tmp/openclaw-telegram-proxy-$$")
+    mkdir -p "$TEMP_DIR"
+    if command -v git > /dev/null 2>&1; then
+        if git clone --depth 1 "$GITHUB_REPO" "$TEMP_DIR" 2>/dev/null; then
+            SOURCE_PATH="$TEMP_DIR"
+            CLEANUP_TEMP="$TEMP_DIR"
+            echo -e "${GREEN}✓ 下载完成${NC}"
+        fi
+    fi
+    if [ -z "$SOURCE_PATH" ] && command -v curl > /dev/null 2>&1; then
+        ZIP_FILE="$TEMP_DIR/main.zip"
+        if curl -sL "https://github.com/hillghost86/openclaw-telegram-proxy/archive/refs/heads/main.zip" -o "$ZIP_FILE" 2>/dev/null; then
+            if command -v unzip > /dev/null 2>&1; then
+                unzip -q "$ZIP_FILE" -d "$TEMP_DIR" 2>/dev/null
+                SOURCE_PATH="$TEMP_DIR/openclaw-telegram-proxy-main"
+                CLEANUP_TEMP="$TEMP_DIR"
+                echo -e "${GREEN}✓ 下载完成${NC}"
+            fi
+        fi
+    fi
+    if [ -z "$SOURCE_PATH" ]; then
+        rm -rf "$TEMP_DIR" 2>/dev/null || true
+        echo -e "${RED}错误: 无法获取插件${NC}"
+        echo -e "${YELLOW}请选择以下方式之一：${NC}"
+        echo -e "${YELLOW}  1. Git:  git clone $GITHUB_REPO && cd openclaw-telegram-proxy && ./install.sh${NC}"
+        echo -e "${YELLOW}  2. NPM:  npm install -g $PLUGIN_NAME${NC}"
+        exit 1
+    fi
 fi
 
-# 获取 NPM 安装路径
-NPM_PATH=$(npm root -g "$PLUGIN_NAME" | tr -d '\n')
-echo -e "${GREEN}✓ NPM 包安装路径:${NC} $NPM_PATH"
+NPM_PATH="$SOURCE_PATH"
+echo -e "${GREEN}✓ 插件路径:${NC} $NPM_PATH"
 echo ""
 
-# 检查 OpenClaw 插件目录是否存在
+# 检查 OpenClaw 插件目录
 if [ ! -d "$EXT_DIR" ]; then
     echo -e "${YELLOW}创建 OpenClaw 插件目录: $EXT_DIR${NC}"
     mkdir -p "$EXT_DIR"
+fi
+
+if [ -d "$EXT_DIR" ] && ! [ -w "$EXT_DIR" ]; then
+    echo -e "${RED}错误: 无写入权限 $EXT_DIR${NC}"
+    exit 1
 fi
 
 # 创建插件目录
@@ -45,10 +111,19 @@ if [ -d "$PLUGIN_DIR" ]; then
     rm -rf "$PLUGIN_DIR"
 fi
 
-# 复制文件
+# 复制文件（排除 node_modules）
 echo -e "${GREEN}复制文件到 OpenClaw 插件目录...${NC}"
 mkdir -p "$PLUGIN_DIR"
-cp -r "$NPM_PATH/"* "$PLUGIN_DIR/"
+if command -v rsync > /dev/null 2>&1; then
+    rsync -a --exclude='node_modules' "$NPM_PATH/" "$PLUGIN_DIR/"
+else
+    cp -r "$NPM_PATH"/. "$PLUGIN_DIR/"
+    rm -rf "$PLUGIN_DIR/node_modules" 2>/dev/null || true
+fi
+# 使用 sudo 时，将文件所有权归还给实际用户（Linux/macOS 均支持）
+if [ -n "$SUDO_USER" ] && [ -n "$SUDO_UID" ] && [ -n "$SUDO_GID" ]; then
+    chown -R "$SUDO_UID:$SUDO_GID" "$PLUGIN_DIR" 2>/dev/null || true
+fi
 echo -e "${GREEN}✓ 复制完成${NC}"
 echo ""
 
@@ -61,21 +136,86 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}✓ 安装完成！${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo -e "${YELLOW}下一步：${NC}"
-echo -e "${YELLOW}1. 配置 OpenClaw: 编辑 ~/.openclaw/openclaw.json${NC}"
-echo -e "${YELLOW}2. 添加插件配置:${NC}"
-echo -e "${YELLOW}3. 重启 OpenClaw: openclaw gateway restart${NC}"
+
+# 配置 proxyUrl：支持命令行参数、环境变量、交互式输入
+CONFIG_FILE="$REAL_HOME/.openclaw/openclaw.json"
+PROXY_URL=""
+# 1. 命令行参数优先
+if [ -n "$1" ]; then
+    PROXY_URL=$(echo "$1" | tr -d '[:space:]')
+    PROXY_URL="${PROXY_URL%/}"
+fi
+# 2. 环境变量
+if [ -z "$PROXY_URL" ] && [ -n "$OPENCLAW_TELEGRAM_PROXY_URL" ]; then
+    PROXY_URL=$(echo "$OPENCLAW_TELEGRAM_PROXY_URL" | tr -d '[:space:]')
+    PROXY_URL="${PROXY_URL%/}"
+fi
+# 3. 交互式输入（仅在有 TTY 且未通过参数/环境变量设置时）
+if [ -z "$PROXY_URL" ] && [ -t 0 ]; then
+    echo -e "${YELLOW}是否现在配置 proxyUrl？(y/n，回车跳过):${NC}"
+    read -r CONFIGURE_NOW
+    if [ "$CONFIGURE_NOW" = "y" ] || [ "$CONFIGURE_NOW" = "Y" ]; then
+        echo -e "${YELLOW}请输入 proxyUrl (例如 https://telegram-proxy.xxx.workers.dev):${NC}"
+        read -r PROXY_URL
+        PROXY_URL=$(echo "$PROXY_URL" | tr -d '[:space:]')
+        PROXY_URL="${PROXY_URL%/}"
+    fi
+fi
+# 写入配置
+CONFIG_WRITTEN=false
+if [ -n "$PROXY_URL" ]; then
+    if command -v node > /dev/null 2>&1; then
+        if HOME="$REAL_HOME" PROXY_URL="$PROXY_URL" node -e "
+const fs = require('fs');
+const path = require('path');
+const configPath = path.join(process.env.HOME || '', '.openclaw', 'openclaw.json');
+let config = {};
+try {
+  if (fs.existsSync(configPath)) {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch (e) {}
+config.plugins = config.plugins || {};
+config.plugins.entries = config.plugins.entries || {};
+config.plugins.entries['openclaw-telegram-proxy'] = {
+  enabled: true,
+  config: { proxyUrl: process.env.PROXY_URL }
+};
+fs.mkdirSync(path.dirname(configPath), { recursive: true });
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+" 2>/dev/null; then
+            if [ -n "$SUDO_USER" ] && [ -n "$SUDO_UID" ] && [ -n "$SUDO_GID" ] && [ -f "$CONFIG_FILE" ]; then
+                chown "$SUDO_UID:$SUDO_GID" "$CONFIG_FILE" 2>/dev/null || true
+            fi
+            CONFIG_WRITTEN=true
+            echo -e "${GREEN}✓ 已写入配置: $CONFIG_FILE${NC}"
+            echo -e "${GREEN}  proxyUrl = $PROXY_URL${NC}"
+        fi
+    fi
+    if [ "$CONFIG_WRITTEN" != "true" ]; then
+        echo -e "${YELLOW}无法自动写入配置，请手动编辑 $CONFIG_FILE${NC}"
+    fi
+fi
 echo ""
-echo -e "${YELLOW}示例配置：${NC}"
-echo -e "${YELLOW} plugins: {${NC}"
-echo -e "${YELLOW}   entries: {${NC}"
-echo -e "${YELLOW}     openclaw-telegram-proxy: {${NC}"
-echo -e "${YELLOW}       enabled: true,${NC}"
-echo -e "${YELLOW}       config: {${NC}"
-echo -e "${YELLOW}         proxyUrl: \"https://your-proxy.com\"${NC}"
-echo -e "${YELLOW}       }${NC}"
-echo -e "${YELLOW}     }${NC}"
-
-
-echo -e "${YELLOW}   }${NC}"
-echo -e "${YELLOW} }${NC}"
+if [ "$CONFIG_WRITTEN" = "true" ]; then
+    echo -e "${YELLOW}下一步：重启 OpenClaw${NC}"
+    echo -e "${YELLOW}  openclaw gateway restart${NC}"
+else
+    echo -e "${YELLOW}下一步：${NC}"
+    echo -e "${YELLOW}1. 配置 proxyUrl: openclaw config edit${NC}"
+    echo -e "${YELLOW}2. 重启 OpenClaw: openclaw gateway restart${NC}"
+    echo ""
+    echo -e "${YELLOW}示例配置：${NC}"
+    echo -e "${YELLOW} plugins: {${NC}"
+    echo -e "${YELLOW}   entries: {${NC}"
+    echo -e "${YELLOW}     openclaw-telegram-proxy: {${NC}"
+    echo -e "${YELLOW}       enabled: true,${NC}"
+    echo -e "${YELLOW}       config: {${NC}"
+    echo -e "${YELLOW}         proxyUrl: \"https://your-proxy.com\"${NC}"
+    echo -e "${YELLOW}       }${NC}"
+    echo -e "${YELLOW}     }${NC}"
+    echo -e "${YELLOW}   }${NC}"
+    echo -e "${YELLOW} }${NC}"
+fi
+# 清理临时下载目录
+[ -n "$CLEANUP_TEMP" ] && [ -d "$CLEANUP_TEMP" ] && rm -rf "$CLEANUP_TEMP" 2>/dev/null || true

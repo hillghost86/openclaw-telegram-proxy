@@ -1,0 +1,13 @@
+# 开发文件
+TODO.md
+*.log
+.DS_Store
+
+# Git
+.git
+.gitignore
+
+# 测试和开发
+node_modules
+*.test.ts
+*.spec.ts

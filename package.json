@@ -13,18 +13,34 @@
     "vpn",
     "reverse-proxy"
   ],
-  "author": "DeepForceCryptoer",
+  "author": "hillghost",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hillghost86/openclaw-telegram-proxy.git"
+    "url": "git+https://github.com/hillghost86/openclaw-telegram-proxy.git"
   },
   "bugs": {
     "url": "https://github.com/hillghost86/openclaw-telegram-proxy/issues"
   },
   "homepage": "https://github.com/hillghost86/openclaw-telegram-proxy#readme",
+  "scripts": {
+    "postinstall": "bash install.sh",
+    "postuninstall": "bash uninstall.sh"
+  },
+  "files": [
+    "index.ts",
+    "openclaw.plugin.json",
+    "cloudflare/worker.js",
+    "install.sh",
+    "uninstall.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=1.0.0"
+  },
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "openclaw": ">=1.0.0"
   },
   "openclaw": {
     "extensions": [
