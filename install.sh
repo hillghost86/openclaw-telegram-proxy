@@ -115,7 +115,7 @@ fi
 echo -e "${GREEN}复制文件到 OpenClaw 插件目录...${NC}"
 mkdir -p "$PLUGIN_DIR"
 if command -v rsync > /dev/null 2>&1; then
-    rsync -a --exclude='node_modules' "$NPM_PATH/" "$PLUGIN_DIR/"
+    rsync -a --exclude='node_modules' --exclude='.git' "$NPM_PATH/" "$PLUGIN_DIR/"
 else
     cp -r "$NPM_PATH"/. "$PLUGIN_DIR/"
     rm -rf "$PLUGIN_DIR/node_modules" 2>/dev/null || true
@@ -161,11 +161,10 @@ if [ -z "$PROXY_URL" ] && [ -t 0 ]; then
         PROXY_URL="${PROXY_URL%/}"
     fi
 fi
-# 写入配置
+# 写入配置（始终添加插件配置结构，proxyUrl 可为空）
 CONFIG_WRITTEN=false
-if [ -n "$PROXY_URL" ]; then
-    if command -v node > /dev/null 2>&1; then
-        if HOME="$REAL_HOME" PROXY_URL="$PROXY_URL" node -e "
+if command -v node > /dev/null 2>&1; then
+    if HOME="$REAL_HOME" PROXY_URL="$PROXY_URL" node -e "
 const fs = require('fs');
 const path = require('path');
 const configPath = path.join(process.env.HOME || '', '.openclaw', 'openclaw.json');
@@ -179,27 +178,34 @@ config.plugins = config.plugins || {};
 config.plugins.entries = config.plugins.entries || {};
 config.plugins.entries['openclaw-telegram-proxy'] = {
   enabled: true,
-  config: { proxyUrl: process.env.PROXY_URL }
+  config: { proxyUrl: process.env.PROXY_URL || '' }
 };
 fs.mkdirSync(path.dirname(configPath), { recursive: true });
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 " 2>/dev/null; then
-            if [ -n "$SUDO_USER" ] && [ -n "$SUDO_UID" ] && [ -n "$SUDO_GID" ] && [ -f "$CONFIG_FILE" ]; then
-                chown "$SUDO_UID:$SUDO_GID" "$CONFIG_FILE" 2>/dev/null || true
-            fi
-            CONFIG_WRITTEN=true
-            echo -e "${GREEN}✓ 已写入配置: $CONFIG_FILE${NC}"
-            echo -e "${GREEN}  proxyUrl = $PROXY_URL${NC}"
+        if [ -n "$SUDO_USER" ] && [ -n "$SUDO_UID" ] && [ -n "$SUDO_GID" ] && [ -f "$CONFIG_FILE" ]; then
+            chown "$SUDO_UID:$SUDO_GID" "$CONFIG_FILE" 2>/dev/null || true
         fi
-    fi
-    if [ "$CONFIG_WRITTEN" != "true" ]; then
+        CONFIG_WRITTEN=true
+        echo -e "${GREEN}✓ 已添加配置: $CONFIG_FILE${NC}"
+        if [ -n "$PROXY_URL" ]; then
+            echo -e "${GREEN}  proxyUrl = $PROXY_URL${NC}"
+        else
+            echo -e "${YELLOW}  请编辑 proxyUrl: openclaw config edit${NC}"
+        fi
+    else
         echo -e "${YELLOW}无法自动写入配置，请手动编辑 $CONFIG_FILE${NC}"
     fi
 fi
 echo ""
 if [ "$CONFIG_WRITTEN" = "true" ]; then
-    echo -e "${YELLOW}下一步：重启 OpenClaw${NC}"
-    echo -e "${YELLOW}  openclaw gateway restart${NC}"
+    echo -e "${YELLOW}下一步：${NC}"
+    if [ -z "$PROXY_URL" ]; then
+        echo -e "${YELLOW}1. 编辑 proxyUrl: openclaw config edit${NC}"
+        echo -e "${YELLOW}2. 重启 OpenClaw: openclaw gateway restart${NC}"
+    else
+        echo -e "${YELLOW}  重启 OpenClaw: openclaw gateway restart${NC}"
+    fi
 else
     echo -e "${YELLOW}下一步：${NC}"
     echo -e "${YELLOW}1. 配置 proxyUrl: openclaw config edit${NC}"
