@@ -191,7 +191,7 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
         if [ -n "$PROXY_URL" ]; then
             echo -e "${GREEN}  proxyUrl = $PROXY_URL${NC}"
         else
-            echo -e "${YELLOW}  请编辑 proxyUrl: openclaw config edit${NC}"
+            echo -e "${YELLOW}  请编辑 ~/.openclaw/openclaw.json 中的 proxyUrl${NC}"
         fi
     else
         echo -e "${YELLOW}无法自动写入配置，请手动编辑 $CONFIG_FILE${NC}"
@@ -201,15 +201,15 @@ echo ""
 if [ "$CONFIG_WRITTEN" = "true" ]; then
     echo -e "${YELLOW}下一步：${NC}"
     if [ -z "$PROXY_URL" ]; then
-        echo -e "${YELLOW}1. 编辑 proxyUrl: openclaw config edit${NC}"
-        echo -e "${YELLOW}2. 重启 OpenClaw: openclaw gateway restart${NC}"
+        echo -e "${YELLOW}1. 编辑 proxyUrl: 手动编辑 ~/.openclaw/openclaw.json${NC}"
+        echo -e "${YELLOW}2. 重启 OpenClaw（必须）: openclaw gateway restart${NC}"
     else
-        echo -e "${YELLOW}  重启 OpenClaw: openclaw gateway restart${NC}"
+        echo -e "${YELLOW}  重启 OpenClaw（必须）: openclaw gateway restart${NC}"
     fi
 else
     echo -e "${YELLOW}下一步：${NC}"
-    echo -e "${YELLOW}1. 配置 proxyUrl: openclaw config edit${NC}"
-    echo -e "${YELLOW}2. 重启 OpenClaw: openclaw gateway restart${NC}"
+    echo -e "${YELLOW}1. 配置 proxyUrl: 手动编辑 ~/.openclaw/openclaw.json${NC}"
+    echo -e "${YELLOW}2. 重启 OpenClaw（必须）: openclaw gateway restart${NC}"
     echo ""
     echo -e "${YELLOW}示例配置：${NC}"
     echo -e "${YELLOW} plugins: {${NC}"

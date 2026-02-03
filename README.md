@@ -31,6 +31,7 @@ curl -sSL https://raw.githubusercontent.com/hillghost86/openclaw-telegram-proxy/
 ```bash
 git clone https://github.com/hillghost86/openclaw-telegram-proxy.git
 cd openclaw-telegram-proxy
+chomd +x install.sh
 ./install.sh
 ```
 
@@ -40,29 +41,13 @@ cd openclaw-telegram-proxy
 npm install -g openclaw-telegram-proxy
 ```
 
-安装脚本会自动将插件复制到 `~/.openclaw/extensions/`，并可交互式配置 proxyUrl。
-
-### 安装时自动配置 proxyUrl
-
-```bash
-# 命令行参数
-./install.sh https://your-proxy.com
-
-# 环境变量
-OPENCLAW_TELEGRAM_PROXY_URL=https://your-proxy.com npm install -g openclaw-telegram-proxy
-```
+安装脚本会自动将插件复制到 `~/.openclaw/extensions/` 并添加配置结构。**NPM 安装后需手动编辑配置文件** `~/.openclaw/openclaw.json`，在 `proxyUrl` 中填入你的代理地址，然后重启 OpenClaw。
 
 ## 配置
 
-### 1. 编辑配置文件
+### 1. 手动编辑配置文件
 
-若安装时未配置 proxyUrl，可执行：
-
-```bash
-openclaw config edit
-```
-
-在 `plugins.entries` 中添加：
+**NPM 安装后**或安装时未配置 proxyUrl，需手动编辑 `~/.openclaw/openclaw.json`，在 `plugins.entries` 中添加或修改：
 
 ```json
 {
@@ -82,7 +67,9 @@ openclaw config edit
 **重要**: 将 `https://your-proxy-domain.com` 替换为你实际的反向代理地址，例如：
 - `https://telegram-proxy.xxx.workers.dev` (Cloudflare Workers)
 
-### 2. 重启 OpenClaw
+### 2. 重启 OpenClaw（必须）
+
+修改配置后**必须重启** OpenClaw 才能生效：
 
 ```bash
 openclaw gateway restart
@@ -132,7 +119,7 @@ cd ~/.openclaw/extensions/openclaw-telegram-proxy
 
 ```bash
 rm -rf ~/.openclaw/extensions/openclaw-telegram-proxy
-openclaw config edit  # 移除插件配置
+# 手动编辑 ~/.openclaw/openclaw.json 移除 openclaw-telegram-proxy 相关配置
 npm uninstall -g openclaw-telegram-proxy  # 若通过 NPM 安装
 ```
 
@@ -148,9 +135,9 @@ npm uninstall -g openclaw-telegram-proxy  # 若通过 NPM 安装
 
 ### 插件未生效
 
-- 检查 `~/.openclaw/openclaw.json` 中 proxyUrl 是否正确
+- 手动编辑 `~/.openclaw/openclaw.json`，检查 proxyUrl 是否正确
 - 确认 JSON 格式无误
-- 执行 `openclaw gateway restart`
+- **必须重启**：执行 `openclaw gateway restart`
 
 ### Telegram 无法连接
 

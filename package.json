@@ -1,6 +1,6 @@
 {
   "name": "openclaw-telegram-proxy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OpenClaw plugin to replace api.telegram.org with custom proxy for Telegram access in restricted regions",
   "type": "module",
   "main": "index.ts",
