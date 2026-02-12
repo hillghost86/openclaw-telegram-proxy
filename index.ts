@@ -1,10 +1,18 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
+const DEBUG = process.env.OPENCLAW_TELEGRAM_PROXY_DEBUG === "1" || process.env.OPENCLAW_TELEGRAM_PROXY_DEBUG === "true";
+
 // Original fetch that we'll restore when needed
 let originalFetch: typeof fetch = fetch;
 
 // Configuration state
 let proxyUrl: string | null = null;
+
+function logDebug(api: OpenClawPluginApi, msg: string) {
+  if (DEBUG && api.logger.debug) {
+    api.logger.debug(`[openclaw-telegram-proxy] ${msg}`);
+  }
+}
 
 /**
  * Replace Telegram API base URL in a request URL
@@ -13,16 +21,14 @@ function replaceTelegramApiUrl(url: string): string {
   if (!proxyUrl) {
     return url;
   }
-
-  // Match api.telegram.org and replace with proxy URL
-  return url.replace("https://api.telegram.org", proxyUrl);
+  const base = proxyUrl.replace(/\/$/, "");
+  return url.replace("https://api.telegram.org", base);
 }
 
 /**
  * Intercept fetch to replace Telegram API calls
  */
 async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  // Extract URL from input
   let urlString: string;
   if (typeof input === "string") {
     urlString = input;
@@ -34,24 +40,22 @@ async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit): Promi
     urlString = String(input);
   }
 
-  // Check if this is a Telegram API call
   if (urlString.includes("api.telegram.org")) {
-    // Replace the URL
     const replacedUrl = replaceTelegramApiUrl(urlString);
+    if (DEBUG && typeof console !== "undefined" && console.debug) {
+      console.debug("[openclaw-telegram-proxy] proxying:", urlString, "->", replacedUrl);
+    }
 
-    // If input is a string or URL, pass the replaced URL
     if (typeof input === "string" || input instanceof URL) {
       return originalFetch(replacedUrl as RequestInfo, init);
     }
 
-    // If input is a Request object, we need to clone it with the new URL
     if (input instanceof Request) {
       const replacedRequest = new Request(replacedUrl, input);
       return originalFetch(replacedRequest, init);
     }
   }
 
-  // Not a Telegram API call, use original fetch
   return originalFetch(input, init);
 }
 
@@ -74,19 +78,16 @@ function removeFetchProxy() {
 }
 
 /**
- * Read plugin config from OpenClaw config
+ * Read proxyUrl from plugin config
  */
 function getProxyUrl(pluginConfig: unknown): string | null {
   if (!pluginConfig || typeof pluginConfig !== "object") {
     return null;
   }
-
   const config = pluginConfig as Record<string, unknown>;
-  
   if (typeof config.proxyUrl === "string") {
-    return config.proxyUrl.trim();
+    return config.proxyUrl.trim() || null;
   }
-
   return null;
 }
 
@@ -100,36 +101,55 @@ const plugin = {
     properties: {
       proxyUrl: {
         type: "string",
-        description: "Telegram API proxy URL (e.g., https://tgapi.dfcer.com)",
+        description: "Telegram API proxy URL (e.g., https://tgapi.yourdomain.com)",
         default: "",
       },
     },
   },
   register(api: OpenClawPluginApi) {
-    // Get plugin config from full config
-    const fullConfig = api.config;
-    
-    // The plugin config is stored in plugins.entries.openclaw-telegram-proxy.config
-    const pluginConfig = (fullConfig.plugins?.entries?.["openclaw-telegram-proxy"] as Record<string, unknown>)?.config;
-    
-    if (pluginConfig) {
-      const url = getProxyUrl(pluginConfig);
-      if (url) {
-        proxyUrl = url;
-        applyFetchProxy();
-        api.logger.info?.(
-          `[openclaw-telegram-proxy] Applied proxy: ${url.replace(/\/$/, "")}`,
-        );
-      } else {
-        api.logger.info?.(
-          `[openclaw-telegram-proxy] No proxy URL configured, using direct connection`,
+    api.logger.info?.("[openclaw-telegram-proxy] 插件注册成功");
+
+    // Prefer api.pluginConfig (passed by loader); fallback to full config path
+    const pluginConfig =
+      api.pluginConfig ??
+      (api.config.plugins?.entries?.["openclaw-telegram-proxy"] as Record<string, unknown> | undefined)
+        ?.config;
+
+    logDebug(api, `pluginConfig: ${JSON.stringify(pluginConfig)}`);
+    logDebug(api, `plugins.entries keys: ${api.config.plugins?.entries ? Object.keys(api.config.plugins.entries).join(",") : ""}`);
+
+    const url = pluginConfig ? getProxyUrl(pluginConfig) : null;
+
+    if (url) {
+      proxyUrl = url.replace(/\/$/, "");
+      applyFetchProxy();
+      api.logger.info?.(`[openclaw-telegram-proxy] Applied proxy: ${proxyUrl}`);
+
+      // Warn if channels.telegram.proxy is also set - it takes precedence over global fetch
+      const tgProxy = (api.config.channels as Record<string, unknown>)?.telegram as
+        | { accounts?: Record<string, { proxy?: string }> }
+        | undefined;
+      const hasTgProxy = tgProxy?.accounts && Object.values(tgProxy.accounts).some((a) => a?.proxy);
+      if (hasTgProxy) {
+        api.logger.warn?.(
+          "[openclaw-telegram-proxy] channels.telegram.accounts[].proxy is set. That SOCKS/HTTP proxy takes precedence; this plugin may not apply to Telegram. Remove proxy from channels.telegram if you want URL replacement (reverse proxy) instead.",
         );
       }
+      logDebug(api, "globalThis.fetch replaced, originalFetch preserved");
     } else {
+      proxyUrl = null;
       api.logger.info?.(
-        `[openclaw-telegram-proxy] No plugin config found, using direct connection`,
+        "[openclaw-telegram-proxy] No proxyUrl configured (proxyUrl empty or missing). Telegram will use direct connection. " +
+          "If in restricted region, add proxyUrl to plugins.entries.openclaw-telegram-proxy.config in openclaw.json.",
       );
     }
+
+    // Hook: log when gateway starts (confirms plugin runs before channels)
+    api.on?.("gateway_start", () => {
+      api.logger.info?.(
+        `[openclaw-telegram-proxy] gateway_start: proxyUrl=${proxyUrl ?? "(none)"}, fetchReplaced=${globalThis.fetch === proxiedFetch}`,
+      );
+    });
   },
 };
 

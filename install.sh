@@ -161,10 +161,10 @@ if [ -z "$PROXY_URL" ] && [ -t 0 ]; then
         PROXY_URL="${PROXY_URL%/}"
     fi
 fi
-# 写入配置（始终添加插件配置结构，proxyUrl 可为空）
+# 写入配置（始终添加插件配置结构、installs 记录以支持 npm 升级，proxyUrl 可为空）
 CONFIG_WRITTEN=false
 if command -v node > /dev/null 2>&1; then
-    if HOME="$REAL_HOME" PROXY_URL="$PROXY_URL" node -e "
+    if HOME="$REAL_HOME" PROXY_URL="$PROXY_URL" PLUGIN_DIR="$PLUGIN_DIR" node -e "
 const fs = require('fs');
 const path = require('path');
 const configPath = path.join(process.env.HOME || '', '.openclaw', 'openclaw.json');
@@ -179,6 +179,22 @@ config.plugins.entries = config.plugins.entries || {};
 config.plugins.entries['openclaw-telegram-proxy'] = {
   enabled: true,
   config: { proxyUrl: process.env.PROXY_URL || '' }
+};
+// 添加 installs 记录以支持 openclaw plugins update
+config.plugins.installs = config.plugins.installs || {};
+let version = '';
+try {
+  const pkgPath = path.join(process.env.PLUGIN_DIR || '', 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    version = (JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
+  }
+} catch (e) {}
+config.plugins.installs['openclaw-telegram-proxy'] = {
+  source: 'npm',
+  spec: 'openclaw-telegram-proxy',
+  installPath: process.env.PLUGIN_DIR || '',
+  version: version || undefined,
+  installedAt: new Date().toISOString()
 };
 fs.mkdirSync(path.dirname(configPath), { recursive: true });
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));

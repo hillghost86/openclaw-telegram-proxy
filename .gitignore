@@ -1,0 +1,12 @@
+# npm 打包产物
+*.tgz
+
+# 依赖
+node_modules
+
+# 系统与 IDE
+.DS_Store
+*.log
+
+# 开发
+TODO.md

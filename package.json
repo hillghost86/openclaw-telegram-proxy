@@ -24,13 +24,15 @@
   },
   "homepage": "https://github.com/hillghost86/openclaw-telegram-proxy#readme",
   "scripts": {
-    "postinstall": "bash install.sh",
-    "postuninstall": "bash uninstall.sh"
+    "postinstall": "node install.js",
+    "preuninstall": "node uninstall.js"
   },
   "files": [
     "index.ts",
     "openclaw.plugin.json",
     "cloudflare/worker.js",
+    "install.js",
+    "uninstall.js",
     "install.sh",
     "uninstall.sh",
     "README.md",

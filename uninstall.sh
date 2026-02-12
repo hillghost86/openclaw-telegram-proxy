@@ -32,20 +32,32 @@ else
     echo -e "${YELLOW}插件未安装: $PLUGIN_DIR${NC}"
 fi
 
-# 可选：从配置中移除插件项
+# 可选：从配置中移除插件项（支持 REMOVE_CONFIG=1 非交互式）
+REMOVE_CONFIG_VAL="${REMOVE_CONFIG:-}"
 if [ -f "$CONFIG_FILE" ] && command -v node > /dev/null 2>&1; then
-    if [ -t 0 ]; then
+    if [ "$REMOVE_CONFIG_VAL" = "1" ] || [ "$REMOVE_CONFIG_VAL" = "y" ] || [ "$REMOVE_CONFIG_VAL" = "Y" ] || [ "$REMOVE_CONFIG_VAL" = "true" ]; then
+        REMOVE_CONFIG="y"
+    elif [ -t 0 ]; then
         echo -e "${YELLOW}是否从配置文件中移除插件配置？(y/n，回车跳过):${NC}"
         read -r REMOVE_CONFIG
-        if [ "$REMOVE_CONFIG" = "y" ] || [ "$REMOVE_CONFIG" = "Y" ]; then
+    fi
+    if [ "$REMOVE_CONFIG" = "y" ] || [ "$REMOVE_CONFIG" = "Y" ]; then
             if HOME="$REAL_HOME" node -e "
 const fs = require('fs');
 const path = require('path');
 const configPath = path.join(process.env.HOME || '', '.openclaw', 'openclaw.json');
 try {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  let changed = false;
   if (config.plugins?.entries?.['openclaw-telegram-proxy']) {
     delete config.plugins.entries['openclaw-telegram-proxy'];
+    changed = true;
+  }
+  if (config.plugins?.installs?.['openclaw-telegram-proxy']) {
+    delete config.plugins.installs['openclaw-telegram-proxy'];
+    changed = true;
+  }
+  if (changed) {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     process.exit(0);
   }
@@ -59,7 +71,6 @@ try {
                 echo -e "${YELLOW}配置中未找到插件项，或移除失败${NC}"
             fi
         fi
-    fi
 fi
 
 echo ""
